@@ -45,13 +45,18 @@ type tracer = {
   (** [note_created p] indicates when a new thread is created. *)
 
   note_read : thread_id -> unit;
-  (** [note_reads p] indicates that the current thread read the resolution of p.
+  (** [note_read p] indicates that the current thread read the resolution of p.
    * e.g. we were waiting for p and p has become resolved.
    * [note_read] implies [note_switch], even if it's not sent, so check [current_id]. *)
 
   note_resolved : thread_id -> ex:exn option -> unit;
   (** [note_resolves p] indicates that [p] has been resolved (woken).
    * If it resolved to failure, the exception is given too. *)
+
+  note_signal : thread_id -> unit;
+  (** [note_signal source] indicates that [source] has signalled the (new) current thread
+   * (e.g. with [Lwt_condition.signal].
+   * As with [note_read], this implies a switch. *)
 
   note_becomes : thread_id -> thread_id -> unit;
   (** [note_becomes p1 p2] indicates that the previously-unresolved p1 now behaves as p2. *)

@@ -225,6 +225,20 @@ external wakener_repr : 'a u -> 'a thread_repr = "%identity"
    being cleaned: *)
 let max_removed = 42
 
+(** Change the tracing context temporarily to another thread. *)
+let as_thread tid fn =
+  let (_, old_tid) as old_data = !current_data in
+  try
+    current_data := (Int_map.empty, tid);
+    Lwt_tracing.(!tracer.note_signal) old_tid;
+    let r = fn () in
+    switch_to_thread old_data;
+    r
+  with ex ->
+    switch_to_thread old_data;
+    raise ex
+
+
 (* +-----------------------------------------------------------------+
    | Restarting/connecting threads                                   |
    +-----------------------------------------------------------------+ *)
@@ -623,16 +637,16 @@ let temp_many l thread_type =
                     cancel_handlers = Chs_empty }
   }
 
-let wait_aux () = {
-  tid = next_id Wait;
+let wait_aux ?(thread_type=Wait) () = {
+  tid = next_id thread_type;
   state = Sleep { cancel = Cancel_no;
                   waiters = Empty;
                   removed = 0;
                   cancel_handlers = Chs_empty }
 }
 
-let wait () =
-  let t = wait_aux () in
+let wait ?thread_type () =
+  let t = wait_aux ?thread_type () in
   (thread t, wakener t)
 
 let task_aux () = {

@@ -249,7 +249,7 @@ val async_exception_hook : (exn -> unit) ref
 type 'a u
   (** The type of thread wakeners. *)
 
-val wait : unit -> 'a t * 'a u
+val wait : ?thread_type:Lwt_tracing.thread_type -> unit -> 'a t * 'a u
   (** [wait ()] is a pair of a thread which sleeps forever (unless it
       is resumed by one of the functions [wakeup], [wakeup_exn] below)
       and the corresponding wakener.  This thread does not block the
@@ -453,3 +453,7 @@ val backtrace_finalize : (exn -> exn) -> (unit -> 'a t) -> (unit -> unit t) -> '
 
 val id_of_thread : 'a t -> Lwt_tracing.thread_id
 val current_id : unit -> Lwt_tracing.thread_id
+
+(** Change the tracing context temporarily to another thread.
+ * A signal from the previous thread to the new one is reported. *)
+val as_thread : Lwt_tracing.thread_id -> (unit -> 'a) -> 'a

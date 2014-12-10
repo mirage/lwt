@@ -37,6 +37,7 @@ type tracer = {
   note_created : thread_id -> thread_type -> unit;
   note_read : thread_id -> unit;
   note_resolved : thread_id -> ex:exn option -> unit;
+  note_signal : thread_id -> unit;
   note_becomes : thread_id -> thread_id -> unit;
   note_label : thread_id -> string -> unit;
   note_switch : unit -> unit;
@@ -48,6 +49,7 @@ let null_tracer =
     note_created = ignore2;
     note_read = ignore;
     note_resolved = (fun _ ~ex:_ -> ());
+    note_signal = ignore;
     note_becomes = ignore2;
     note_label = ignore2;
     note_switch = ignore;
