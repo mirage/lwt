@@ -153,8 +153,10 @@ let from_direct f =
     hooks = ref [];
   }
 
-let on_terminate s f =
+let on_termination s f =
   s.hooks := f :: !(s.hooks)
+
+let on_terminate = on_termination
 
 let of_list l =
   let l = ref l in
@@ -323,6 +325,14 @@ class ['a] bounded_push_impl (info : 'a push_bounded) wakener_cell last hooks = 
       if info.pushb_pending <> None then begin
         info.pushb_pending <- None;
         Lwt.wakeup_later_exn info.pushb_push_wakener Closed
+      end;
+      (* Send a signal if at least one thread is waiting for a new
+         element. *)
+      if info.pushb_waiting then begin
+        info.pushb_waiting <- false;
+        let old_wakener = !wakener_cell in
+        (* Signal that a new value has been received. *)
+        Lwt.wakeup_later old_wakener ()
       end;
       List.iter (fun f -> f ()) !hooks
     end
@@ -1042,6 +1052,7 @@ let choose streams =
                 streams := source s :: l;
                 Lwt.return x
             | None ->
+                streams := l;
                 next ()
   in
   from next

@@ -109,6 +109,19 @@ let suite = suite "lwt_stream" [
        let acc = acc && state (Lwt_stream.to_list stream) = Return [3; 4; 7] in
        return acc);
 
+  test "create_bounded close"
+    (fun () ->
+       let stream, push = Lwt_stream.create_bounded 1 in
+       let acc = true in
+       let acc = acc && state (push#push 1) = Return () in
+       let iter_delayed = Lwt_stream.to_list stream in
+       Lwt_unix.yield () >>= fun () ->
+       push#close;
+       Lwt_unix.yield () >>= fun () ->
+       let acc = acc && state iter_delayed = Return [1] in
+       return acc
+    );
+
   test "get_while"
     (fun () ->
        let stream = Lwt_stream.of_list [1; 2; 3; 4; 5] in
@@ -279,11 +292,11 @@ let suite = suite "lwt_stream" [
        Lwt_stream.to_list (Lwt_stream.map_exn stream) >>= fun l' ->
        return (l = l'));
 
-  test "on_terminate"
+  test "on_termination"
     (fun () ->
       let st = Lwt_stream.of_list [1; 2] in
       let b = ref false in
-      Lwt_stream.on_terminate st (fun () -> b := true);
+      Lwt_stream.on_termination st (fun () -> b := true);
       ignore (Lwt_stream.peek st);
       let b1 = !b = false in
       ignore (Lwt_stream.junk st);
@@ -293,4 +306,8 @@ let suite = suite "lwt_stream" [
       ignore (Lwt_stream.peek st);
       let b3 = !b = true in
       Lwt.return (b1 && b2 && b3));
+
+  test "choose_exhausted"
+    (fun () ->
+      Lwt_stream.(to_list (choose [of_list []])) >|= fun _ -> true);
 ]

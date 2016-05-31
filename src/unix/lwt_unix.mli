@@ -110,7 +110,7 @@ val with_async_none : (unit -> 'a) -> 'a
   *)
 
 val with_async_detach : (unit -> 'a) -> 'a
-  (** [with_async_none f] is a shorthand for:
+  (** [with_async_detach f] is a shorthand for:
 
       {[
         Lwt.with_value async_method_key (Some Async_detach) f
@@ -118,7 +118,7 @@ val with_async_detach : (unit -> 'a) -> 'a
   *)
 
 val with_async_switch : (unit -> 'a) -> 'a
-  (** [with_async_none f] is a shorthand for:
+  (** [with_async_switch f] is a shorthand for:
 
       {[
         Lwt.with_value async_method_key (Some Async_switch) f
@@ -416,6 +416,9 @@ val lstat : string -> stats Lwt.t
 val fstat : file_descr -> stats Lwt.t
   (** Wrapper for [Unix.fstat] *)
 
+val file_exists : string -> bool Lwt.t
+  (** [file_exists name] tests if a file named [name] exists. *)
+
 val isatty : file_descr -> bool Lwt.t
   (** Wrapper for [Unix.isatty] *)
 
@@ -456,6 +459,9 @@ module LargeFile : sig
 
   val fstat : file_descr -> stats Lwt.t
     (** Wrapper for [Unix.LargeFile.fstat] *)
+
+  val file_exists : string -> bool Lwt.t
+    (** [file_exists name] tests if a file named [name] exists. *)
 end
 
 (** {2 Operations on file names} *)

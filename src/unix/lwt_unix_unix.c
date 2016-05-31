@@ -55,7 +55,7 @@ CAMLprim value lwt_unix_writable(value fd)
   pollfd.events = POLLOUT;
   pollfd.revents = 0;
   if (poll(&pollfd, 1, 0) < 0)
-    uerror("readable", Nothing);
+    uerror("writable", Nothing);
   return (Val_bool(pollfd.revents & POLLOUT));
 }
 
@@ -87,6 +87,9 @@ CAMLprim value lwt_unix_get_page_size(value Unit)
   return Val_long(page_size);
 }
 
+#ifdef __CYGWIN__
+LWT_NOT_AVAILABLE4(unix_mincore)
+#else
 CAMLprim value lwt_unix_mincore(value val_buffer, value val_offset, value val_length, value val_states)
 {
   long len = Wosize_val(val_states);
@@ -97,6 +100,7 @@ CAMLprim value lwt_unix_mincore(value val_buffer, value val_offset, value val_le
     Field(val_states, i) = Val_bool(vec[i] & 1);
   return Val_unit;
 }
+#endif
 
 /* +-----------------------------------------------------------------+
    | read/write                                                      |
@@ -777,6 +781,9 @@ CAMLprim value lwt_unix_guess_blocking_job(value val_fd)
    | JOB: wait_mincore                                               |
    +-----------------------------------------------------------------+ */
 
+#ifdef __CYGWIN__
+LWT_NOT_AVAILABLE2(unix_wait_mincore_job)
+#else
 struct job_wait_mincore {
   struct lwt_unix_job job;
   char *ptr;
@@ -801,6 +808,7 @@ CAMLprim value lwt_unix_wait_mincore_job(value val_buffer, value val_offset)
   job->ptr = (char*)Caml_ba_data_val(val_buffer) + Long_val(val_offset);
   return lwt_unix_alloc_job(&(job->job));
 }
+#endif
 
 /* +-----------------------------------------------------------------+
    | JOB: open                                                       |
@@ -832,8 +840,23 @@ static int open_flag_table[] = {
   O_DSYNC,
   O_SYNC,
   O_RSYNC,
+  0,
+#ifdef O_CLOEXEC
+  O_CLOEXEC
+#else
+#define NEED_CLOEXEC_EMULATION
   0
+#endif
 };
+
+#ifdef NEED_CLOEXEC_EMULATION
+static int open_cloexec_table[14] = {
+  0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0,
+  0,
+  1
+};
+#endif
 
 struct job_open {
   struct lwt_unix_job job;
@@ -850,6 +873,18 @@ static void worker_open(struct job_open *job)
 {
   int fd;
   fd = open(job->name, job->flags, job->perms);
+#if defined(NEED_CLOEXEC_EMULATION) && defined(FD_CLOEXEC)
+  if (fd >= 0 && job->fd) {
+    int flags = fcntl(fd, F_GETFD, 0);
+    if (flags == -1 ||
+        fcntl(fd, F_SETFD, flags | FD_CLOEXEC) == -1) {
+      int serrno = errno;
+      close(fd);
+      errno = serrno;
+      fd = -1;
+    }
+  }
+#endif
   job->fd = fd;
   job->error_code = errno;
   if (fd >= 0) {
@@ -875,6 +910,9 @@ static value result_open(struct job_open *job)
 CAMLprim value lwt_unix_open_job(value name, value flags, value perms)
 {
   LWT_UNIX_INIT_JOB_STRING(job, open, 0, name);
+#ifdef NEED_CLOEXEC_EMULATION
+  job->fd = convert_flag_list(flags, open_cloexec_table) != 0;
+#endif
   job->flags = convert_flag_list(flags, open_flag_table);
   job->perms = Int_val(perms);
   return lwt_unix_alloc_job(&(job->job));
